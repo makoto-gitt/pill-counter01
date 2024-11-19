@@ -91,15 +91,23 @@
         predictions.forEach(prediction => {
           // 錠剤を検出 (物体名が 'bottle' や 'cup' など、適切なラベルを使用)
           if (prediction.class === 'bottle' || prediction.class === 'cup') {
-            pillCount++;
-            // 錠剤を囲む緑の枠を描画
-            ctx.beginPath();
-            ctx.rect(prediction.bbox[0], prediction.bbox[1], prediction.bbox[2], prediction.bbox[3]);
-            ctx.lineWidth = 4;
-            ctx.strokeStyle = 'green';
-            ctx.fillStyle = 'green';
-            ctx.stroke();
-            ctx.fillText(prediction.class, prediction.bbox[0], prediction.bbox[1] > 10 ? prediction.bbox[1] - 5 : 10);
+            // 錠剤の形状を円形かどうかを確認
+            const [x, y, width, height] = prediction.bbox;
+            const radius = Math.min(width, height) / 2;
+            const aspectRatio = width / height;
+
+            // 近似円形を定義 (アスペクト比が1に近ければ円形と判断)
+            if (aspectRatio > 0.8 && aspectRatio < 1.2) {
+              pillCount++;
+              // 錠剤を囲む緑の枠を描画
+              ctx.beginPath();
+              ctx.arc(x + radius, y + radius, radius, 0, 2 * Math.PI);
+              ctx.lineWidth = 4;
+              ctx.strokeStyle = 'green';
+              ctx.fillStyle = 'green';
+              ctx.stroke();
+              ctx.fillText(prediction.class, x + radius, y + radius > 10 ? y + radius - 5 : 10);
+            }
           }
         });
 
