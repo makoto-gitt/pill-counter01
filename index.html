@@ -26,15 +26,13 @@
       margin: 10px 0;
     }
   </style>
-  <!-- TensorFlow.jsの読み込み -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+  <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
 </head>
 <body>
   <h1>錠剤カウンター</h1>
   <p>必要な錠剤の数を入力してください:</p>
   <input type="number" id="requiredPills" placeholder="必要数" />
-  <button onclick="startCamera()">カメラを起動</button>
+  <button onclick="startCounting()">カメラを起動</button>
   <video id="video" autoplay playsinline></video>
   <canvas id="canvas"></canvas>
   <p id="result"></p>
@@ -44,82 +42,101 @@
     const canvas = document.getElementById("canvas");
     const result = document.getElementById("result");
     let stream;
-    let model;
 
-    async function startCamera() {
-      // TensorFlow.jsモデルの読み込み
-      model = await cocoSsd.load();
-      console.log("Model loaded");
+    async function startCounting() {
+      const requiredPills = parseInt(document.getElementById("requiredPills").value);
 
+      if (isNaN(requiredPills) || requiredPills <= 0) {
+        result.textContent = "正しい数を入力してください。";
+        return;
+      }
+
+      // カメラの映像を取得
       try {
-        // 外カメラの設定 (facingMode: "environment" で背面カメラを指定)
-        const constraints = {
-          video: {
-            facingMode: "environment", // 外カメラを使用
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          }
-        };
-
-        // カメラを取得
-        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
         video.srcObject = stream;
 
-        // 錠剤の検出を開始
-        detectPills();
+        // カウント処理開始
+        video.addEventListener("play", async () => {
+          const detectedPills = await countPillsFromCamera();
+
+          // 比較して結果を表示
+          if (detectedPills === requiredPills) {
+            result.textContent = "OK: 錠剤の数が正しいです！";
+          } else if (detectedPills < requiredPills) {
+            result.textContent = `不足: あと ${requiredPills - detectedPills} 錠必要です。`;
+          } else {
+            result.textContent = `過剰: ${detectedPills - requiredPills} 錠多いです。`;
+          }
+
+          // カメラ停止
+          stopCamera();
+        });
       } catch (error) {
-        console.error(error);
-        result.textContent = "カメラにアクセスできませんでした。エラー: " + error.message;
+        result.textContent = "カメラにアクセスできませんでした。";
       }
     }
 
-    async function detectPills() {
-      const ctx = canvas.getContext("2d");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+    async function countPillsFromCamera() {
+      return new Promise((resolve) => {
+        const ctx = canvas.getContext("2d");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
 
-      async function processFrame() {
-        // カメラ映像をキャプチャ
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const interval = setInterval(() => {
+          // 映像をキャプチャ
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const src = cv.imread(canvas);
+          const gray = new cv.Mat();
 
-        // 物体検出を実行
-        const predictions = await model.detect(canvas);
+          // グレースケール変換
+          cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
 
-        let pillCount = 0;
-        
-        // 検出された物体を確認
-        predictions.forEach(prediction => {
-          // 錠剤を検出 (物体名が 'bottle' や 'cup' など、適切なラベルを使用)
-          if (prediction.class === 'bottle' || prediction.class === 'cup') {
-            // 錠剤の形状を円形かどうかを確認
-            const [x, y, width, height] = prediction.bbox;
-            const radius = Math.min(width, height) / 2;
-            const aspectRatio = width / height;
+          // 画像を平滑化 (円を検出しやすくする)
+          const blurred = new cv.Mat();
+          cv.GaussianBlur(gray, blurred, new cv.Size(9, 9), 2, 2);
 
-            // 近似円形を定義 (アスペクト比が1に近ければ円形と判断)
-            if (aspectRatio > 0.8 && aspectRatio < 1.2) {
-              pillCount++;
-              // 錠剤を囲む緑の枠を描画
-              ctx.beginPath();
-              ctx.arc(x + radius, y + radius, radius, 0, 2 * Math.PI);
-              ctx.lineWidth = 4;
-              ctx.strokeStyle = 'green';
-              ctx.fillStyle = 'green';
-              ctx.stroke();
-              ctx.fillText(prediction.class, x + radius, y + radius > 10 ? y + radius - 5 : 10);
-            }
+          // 円の検出 (Hough変換)
+          const circles = new cv.Mat();
+          cv.HoughCircles(blurred, circles, cv.HOUGH_GRADIENT, 1, 20, 100, 30, 0, 0);
+
+          let pillCount = 0;
+
+          // 検出した円を描画
+          for (let i = 0; i < circles.cols; ++i) {
+            const circle = circles.data32F.slice(i * 3, i * 3 + 3);
+            const x = circle[0];
+            const y = circle[1];
+            const radius = circle[2];
+
+            // 円を描画
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, 2 * Math.PI);
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = 'green';
+            ctx.fillStyle = 'green';
+            ctx.stroke();
+            ctx.fillText("錠剤", x - 10, y - radius - 10);
+
+            pillCount++;
           }
-        });
 
-        // 検出された錠剤の数を表示
-        result.textContent = `検出された錠剤の数: ${pillCount}`;
+          // 後始末
+          src.delete();
+          gray.delete();
+          blurred.delete();
+          circles.delete();
 
-        // 次のフレームを処理
-        requestAnimationFrame(processFrame);
+          clearInterval(interval); // 処理終了
+          resolve(pillCount);
+        }, 1000); // 1秒ごとに処理
+      });
+    }
+
+    function stopCamera() {
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
       }
-
-      // 最初のフレームを処理
-      processFrame();
     }
   </script>
 </body>
