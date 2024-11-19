@@ -1,4 +1,5 @@
-<!DOCTYPE html> 
+<!--感知枠、リアルタイム数え、精度緩め-->
+<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
@@ -96,29 +97,17 @@
       }
     }
 
-    // 白い錠剤をカウントし、結果を返す
+    // 錠剤をカウントし、結果を返す
     function countPillsFromCamera(ctx) {
       const src = cv.imread(canvas);
-      const hsv = new cv.Mat();
-      const mask = new cv.Mat();
+      const gray = new cv.Mat();
 
-      // RGBをHSVに変換
-      cv.cvtColor(src, hsv, cv.COLOR_RGBA2HSV);
-
-      // 白色の範囲を指定 (HSV範囲で白色を抽出)
-      const lowerWhite = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [0, 0, 200, 0]);
-      const upperWhite = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [180, 50, 255, 0]);
-      
-      // 白色部分のマスク作成
-      cv.inRange(hsv, lowerWhite, upperWhite, mask);
-
-      // 白色部分のみを抽出
-      const whiteOnly = new cv.Mat();
-      cv.bitwise_and(src, src, whiteOnly, mask);
+      // グレースケ変換
+      cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
 
       // 画像を平滑化 (円を検出しやすくする)
       const blurred = new cv.Mat();
-      cv.GaussianBlur(whiteOnly, blurred, new cv.Size(9, 9), 2, 2);
+      cv.GaussianBlur(gray, blurred, new cv.Size(9, 9), 2, 2);
 
       // 円の検出 (Hough変換)
       const circles = new cv.Mat();
@@ -149,11 +138,7 @@
 
       // 後始末
       src.delete();
-      hsv.delete();
-      mask.delete();
-      lowerWhite.delete();
-      upperWhite.delete();
-      whiteOnly.delete();
+      gray.delete();
       blurred.delete();
       circles.delete();
 
