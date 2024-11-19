@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
@@ -96,42 +96,44 @@
       }
     }
 
-    // 錠剤をカウントし、結果を返す
+    // 白い錠剤をカウントし、結果を返す
     function countPillsFromCamera(ctx) {
       const src = cv.imread(canvas);
-      const gray = new cv.Mat();
+      const hsv = new cv.Mat();
+      const mask = new cv.Mat();
 
-      // グレースケール変換
-      cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+      // RGBをHSVに変換
+      cv.cvtColor(src, hsv, cv.COLOR_RGBA2HSV);
 
-      // 二値化処理 (黒い背景とのコントラストを強調)
-      const binary = new cv.Mat();
-      cv.threshold(gray, binary, 60, 255, cv.THRESH_BINARY); // 二値化で背景と錠剤を分ける
+      // 白色の範囲を指定 (HSV範囲で白色を抽出)
+      const lowerWhite = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [0, 0, 200, 0]);
+      const upperWhite = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [180, 50, 255, 0]);
+      
+      // 白色部分のマスク作成
+      cv.inRange(hsv, lowerWhite, upperWhite, mask);
+
+      // 白色部分のみを抽出
+      const whiteOnly = new cv.Mat();
+      cv.bitwise_and(src, src, whiteOnly, mask);
 
       // 画像を平滑化 (円を検出しやすくする)
       const blurred = new cv.Mat();
-      cv.GaussianBlur(binary, blurred, new cv.Size(9, 9), 2, 2);
+      cv.GaussianBlur(whiteOnly, blurred, new cv.Size(9, 9), 2, 2);
 
       // 円の検出 (Hough変換)
       const circles = new cv.Mat();
-      cv.HoughCircles(blurred, circles, cv.HOUGH_GRADIENT, 1, 20, 100, 30, 10, 100); // minRadiusとmaxRadiusを調整
+      
+      // Hough変換パラメータ調整
+      cv.HoughCircles(blurred, circles, cv.HOUGH_GRADIENT, 1, 20, 100, 30, 10, 100); // minRadiusとmaxRadiusを変更
 
       let pillCount = 0;
 
       // 検出した円を描画
-      const detectedCircles = [];
       for (let i = 0; i < circles.cols; ++i) {
         const circle = circles.data32F.slice(i * 3, i * 3 + 3);
         const x = circle[0];
         const y = circle[1];
         const radius = circle[2];
-
-        // 正円に近いかどうか判定
-        const aspectRatio = radius / Math.sqrt((x - circle[0]) ** 2 + (y - circle[1]) ** 2);
-        if (aspectRatio > 0.9 && aspectRatio < 1.1) { // 近似円判定条件
-          detectedCircles.push(circle);
-          pillCount++;
-        }
 
         // 円を描画
         ctx.beginPath();
@@ -141,12 +143,17 @@
         ctx.fillStyle = 'green';
         ctx.stroke();
         ctx.fillText("錠剤", x - 10, y - radius - 10);
+
+        pillCount++;
       }
 
       // 後始末
       src.delete();
-      gray.delete();
-      binary.delete();
+      hsv.delete();
+      mask.delete();
+      lowerWhite.delete();
+      upperWhite.delete();
+      whiteOnly.delete();
       blurred.delete();
       circles.delete();
 
