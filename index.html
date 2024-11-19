@@ -10,7 +10,7 @@
       margin: 20px;
       text-align: center;
     }
-    video {
+    video, canvas {
       margin-top: 10px;
       width: 100%;
       max-width: 400px;
@@ -24,9 +24,6 @@
     p {
       font-size: 18px;
       margin: 10px 0;
-    }
-    canvas {
-      display: none; /* canvasは非表示にして映像のみ表示 */
     }
   </style>
   <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
@@ -63,28 +60,36 @@
 
         // カウント処理開始
         video.addEventListener("play", async () => {
+          // 毎フレームで円検出を行う
           const ctx = canvas.getContext("2d");
           canvas.width = video.videoWidth;
           canvas.height = video.videoHeight;
 
           function processFrame() {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height); // 映像をcanvasに描画
-            const detectedPills = countPillsFromCamera(ctx); // 錠剤のカウント
-            updateResult(detectedPills, requiredPills); // 結果をリアルタイムで更新
-
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            countPillsFromCamera(ctx);
             requestAnimationFrame(processFrame); // 次のフレームを処理
           }
 
           processFrame(); // フレーム処理を開始
+
+          // 比較して結果を表示
+          let detectedPills = await countPillsFromCamera(ctx);
+          if (detectedPills === requiredPills) {
+            result.textContent = "OK: 錠剤の数が正しいです！";
+          } else if (detectedPills < requiredPills) {
+            result.textContent = 不足: あと ${requiredPills - detectedPills} 錠必要です。;
+          } else {
+            result.textContent = 過剰: ${detectedPills - requiredPills} 錠多いです。;
+          }
         });
       } catch (error) {
         result.textContent = "カメラにアクセスできませんでした。";
       }
     }
 
-    // 錠剤をカウントし、結果を返す
-    function countPillsFromCamera(ctx) {
-      const src = cv.imread(video); // <video>要素から直接画像を取得
+    async function countPillsFromCamera(ctx) {
+      const src = cv.imread(canvas);
       const gray = new cv.Mat();
 
       // グレースケール変換
@@ -111,10 +116,10 @@
         ctx.beginPath();
         ctx.arc(x, y, radius, 0, 2 * Math.PI);
         ctx.lineWidth = 4;
-        ctx.strokeStyle = 'green'; // 緑色の枠線
+        ctx.strokeStyle = 'green';
         ctx.fillStyle = 'green';
         ctx.stroke();
-        ctx.fillText("錠剤", x - 10, y - radius - 10); // 錠剤のラベル
+        ctx.fillText("錠剤", x - 10, y - radius - 10);
 
         pillCount++;
       }
@@ -127,17 +132,6 @@
 
       return pillCount;
     }
-
-    // 結果をリアルタイムで更新
-    function updateResult(detectedPills, requiredPills) {
-      if (detectedPills === requiredPills) {
-        result.textContent = `OK: 錠剤の数が正しいです！(${detectedPills}錠)`;
-      } else if (detectedPills < requiredPills) {
-        result.textContent = `不足: あと ${requiredPills - detectedPills} 錠必要です。(${detectedPills}錠検出)`;
-      } else {
-        result.textContent = `過剰: ${detectedPills - requiredPills} 錠多いです。(${detectedPills}錠検出)`;
-      }
-    }
   </script>
 </body>
-</html>
+</html> 
