@@ -53,14 +53,28 @@
 
       // カメラの映像を取得
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { exact: "environment" } } // 外カメラを指定
+        });
         video.srcObject = stream;
 
         // カウント処理開始
         video.addEventListener("play", async () => {
-          const detectedPills = await countPillsFromCamera();
+          // 毎フレームで円検出を行う
+          const ctx = canvas.getContext("2d");
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+
+          function processFrame() {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            countPillsFromCamera(ctx);
+            requestAnimationFrame(processFrame); // 次のフレームを処理
+          }
+
+          processFrame(); // フレーム処理を開始
 
           // 比較して結果を表示
+          let detectedPills = await countPillsFromCamera(ctx);
           if (detectedPills === requiredPills) {
             result.textContent = "OK: 錠剤の数が正しいです！";
           } else if (detectedPills < requiredPills) {
@@ -68,75 +82,55 @@
           } else {
             result.textContent = `過剰: ${detectedPills - requiredPills} 錠多いです。`;
           }
-
-          // カメラ停止
-          stopCamera();
         });
       } catch (error) {
         result.textContent = "カメラにアクセスできませんでした。";
       }
     }
 
-    async function countPillsFromCamera() {
-      return new Promise((resolve) => {
-        const ctx = canvas.getContext("2d");
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+    async function countPillsFromCamera(ctx) {
+      const src = cv.imread(canvas);
+      const gray = new cv.Mat();
 
-        const interval = setInterval(() => {
-          // 映像をキャプチャ
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const src = cv.imread(canvas);
-          const gray = new cv.Mat();
+      // グレースケール変換
+      cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
 
-          // グレースケール変換
-          cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+      // 画像を平滑化 (円を検出しやすくする)
+      const blurred = new cv.Mat();
+      cv.GaussianBlur(gray, blurred, new cv.Size(9, 9), 2, 2);
 
-          // 画像を平滑化 (円を検出しやすくする)
-          const blurred = new cv.Mat();
-          cv.GaussianBlur(gray, blurred, new cv.Size(9, 9), 2, 2);
+      // 円の検出 (Hough変換)
+      const circles = new cv.Mat();
+      cv.HoughCircles(blurred, circles, cv.HOUGH_GRADIENT, 1, 20, 100, 30, 0, 0);
 
-          // 円の検出 (Hough変換)
-          const circles = new cv.Mat();
-          cv.HoughCircles(blurred, circles, cv.HOUGH_GRADIENT, 1, 20, 100, 30, 0, 0);
+      let pillCount = 0;
 
-          let pillCount = 0;
+      // 検出した円を描画
+      for (let i = 0; i < circles.cols; ++i) {
+        const circle = circles.data32F.slice(i * 3, i * 3 + 3);
+        const x = circle[0];
+        const y = circle[1];
+        const radius = circle[2];
 
-          // 検出した円を描画
-          for (let i = 0; i < circles.cols; ++i) {
-            const circle = circles.data32F.slice(i * 3, i * 3 + 3);
-            const x = circle[0];
-            const y = circle[1];
-            const radius = circle[2];
+        // 円を描画
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, 2 * Math.PI);
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = 'green';
+        ctx.fillStyle = 'green';
+        ctx.stroke();
+        ctx.fillText("錠剤", x - 10, y - radius - 10);
 
-            // 円を描画
-            ctx.beginPath();
-            ctx.arc(x, y, radius, 0, 2 * Math.PI);
-            ctx.lineWidth = 4;
-            ctx.strokeStyle = 'green';
-            ctx.fillStyle = 'green';
-            ctx.stroke();
-            ctx.fillText("錠剤", x - 10, y - radius - 10);
-
-            pillCount++;
-          }
-
-          // 後始末
-          src.delete();
-          gray.delete();
-          blurred.delete();
-          circles.delete();
-
-          clearInterval(interval); // 処理終了
-          resolve(pillCount);
-        }, 1000); // 1秒ごとに処理
-      });
-    }
-
-    function stopCamera() {
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
+        pillCount++;
       }
+
+      // 後始末
+      src.delete();
+      gray.delete();
+      blurred.delete();
+      circles.delete();
+
+      return pillCount;
     }
   </script>
 </body>
