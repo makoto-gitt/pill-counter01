@@ -134,6 +134,9 @@
       cv.matchTemplate(gray, pillTemplate, result, cv.TM_CCOEFF_NORMED);
 
       const threshold = 0.8; // マッチングしきい値
+      let pillCount = 0;
+
+      // マッチング結果を評価し、一致する場所に矩形を描画
       for (let y = 0; y < result.rows; y++) {
         for (let x = 0; x < result.cols; x++) {
           if (result.data32F[y * result.cols + x] > threshold) {
@@ -145,11 +148,10 @@
             ctx.lineWidth = 2;
             ctx.strokeStyle = 'green';
             ctx.stroke();
+            pillCount++;
           }
         }
       }
-
-      const pillCount = countDetectedPills(result, threshold);
 
       // 後始末
       src.delete();
@@ -157,19 +159,6 @@
       result.delete();
       matched.delete();
 
-      return pillCount;
-    }
-
-    // 一致した錠剤をカウント
-    function countDetectedPills(result, threshold) {
-      let pillCount = 0;
-      for (let y = 0; y < result.rows; y++) {
-        for (let x = 0; x < result.cols; x++) {
-          if (result.data32F[y * result.cols + x] > threshold) {
-            pillCount++;
-          }
-        }
-      }
       return pillCount;
     }
 
