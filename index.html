@@ -55,7 +55,7 @@
         // 外カメラの設定 (facingMode: "environment" で背面カメラを指定)
         const constraints = {
           video: {
-            facingMode: "environment",
+            facingMode: "environment", // 外カメラを使用
             width: { ideal: 1280 },
             height: { ideal: 720 }
           }
@@ -89,7 +89,7 @@
         
         // 検出された物体を確認
         predictions.forEach(prediction => {
-          // 錠剤を検出 (オブジェクト名が 'bottle' や 'cup' など、錠剤に近いものに基づいて検出)
+          // 錠剤を検出 (物体名が 'bottle' や 'cup' など、適切なラベルを使用)
           if (prediction.class === 'bottle' || prediction.class === 'cup') {
             pillCount++;
             // 錠剤を囲む緑の枠を描画
