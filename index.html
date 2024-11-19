@@ -101,7 +101,7 @@
       const src = cv.imread(canvas);
       const gray = new cv.Mat();
 
-      // グレースケール変換
+      // グレースケ変換
       cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
 
       // 画像を平滑化 (円を検出しやすくする)
@@ -110,7 +110,9 @@
 
       // 円の検出 (Hough変換)
       const circles = new cv.Mat();
-      cv.HoughCircles(blurred, circles, cv.HOUGH_GRADIENT, 1, 20, 100, 30, 0, 0);
+      
+      // Hough変換パラメータ調整
+      cv.HoughCircles(blurred, circles, cv.HOUGH_GRADIENT, 1, 20, 100, 30, 10, 100); // minRadiusとmaxRadiusを変更
 
       let pillCount = 0;
 
