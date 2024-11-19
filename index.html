@@ -26,8 +26,9 @@
       margin: 10px 0;
     }
   </style>
-  <!-- OpenCV.js の読み込み -->
-  <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+  <!-- TensorFlow.jsの読み込み -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
 </head>
 <body>
   <h1>錠剤カウンター</h1>
@@ -43,15 +44,20 @@
     const canvas = document.getElementById("canvas");
     const result = document.getElementById("result");
     let stream;
+    let model;
 
     async function startCamera() {
+      // TensorFlow.jsモデルの読み込み
+      model = await cocoSsd.load();
+      console.log("Model loaded");
+
       try {
-        // 外カメラの選択（facingMode: "environment" で外カメラを指定）
+        // 外カメラの設定 (facingMode: "environment" で背面カメラを指定)
         const constraints = {
           video: {
-            facingMode: "environment", // 外カメラを指定
-            width: { ideal: 1280 }, // 解像度を指定
-            height: { ideal: 720 }  // 解像度を指定
+            facingMode: "environment",
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
           }
         };
 
@@ -63,76 +69,42 @@
         detectPills();
       } catch (error) {
         console.error(error);
-        // カメラアクセスエラーの詳細なメッセージ
-        if (error.name === "NotFoundError") {
-          result.textContent = "外カメラが見つかりませんでした。デバイスにカメラが接続されているか確認してください。";
-        } else if (error.name === "NotAllowedError") {
-          result.textContent = "カメラのアクセスが拒否されました。ブラウザの設定でカメラの許可を確認してください。";
-        } else {
-          result.textContent = "カメラにアクセスできませんでした。エラー: " + error.message;
-        }
+        result.textContent = "カメラにアクセスできませんでした。エラー: " + error.message;
       }
     }
 
-    function detectPills() {
+    async function detectPills() {
       const ctx = canvas.getContext("2d");
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
 
-      function processFrame() {
+      async function processFrame() {
         // カメラ映像をキャプチャ
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const src = cv.imread(canvas);
-        const gray = new cv.Mat();
 
-        // グレースケール変換
-        cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+        // 物体検出を実行
+        const predictions = await model.detect(canvas);
 
-        // 画像のぼかし (ガウスぼかし)
-        const blurred = new cv.Mat();
-        cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0);
-
-        // 二値化処理
-        const binary = new cv.Mat();
-        cv.threshold(blurred, binary, 127, 255, cv.THRESH_BINARY);
-
-        // エッジ検出 (Canny)
-        const edges = new cv.Mat();
-        cv.Canny(binary, edges, 50, 150);
-
-        // 輪郭を検出
-        const contours = new cv.MatVector();
-        const hierarchy = new cv.Mat();
-        cv.findContours(edges, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-
-        // 検出された輪郭を緑の枠で描画
         let pillCount = 0;
-        for (let i = 0; i < contours.size(); i++) {
-          const contour = contours.get(i);
-          const rect = cv.boundingRect(contour);
-
-          // アスペクト比がほぼ1 (円形) の場合のみ錠剤と見なす
-          const aspectRatio = rect.width / rect.height;
-          if (aspectRatio > 0.8 && aspectRatio < 1.2 && rect.width > 20) {
-            pillCount++; // 錠剤としてカウント
-            cv.rectangle(src, new cv.Point(rect.x, rect.y), new cv.Point(rect.x + rect.width, rect.y + rect.height), [0, 255, 0, 255], 2);
+        
+        // 検出された物体を確認
+        predictions.forEach(prediction => {
+          // 錠剤を検出 (オブジェクト名が 'bottle' や 'cup' など、錠剤に近いものに基づいて検出)
+          if (prediction.class === 'bottle' || prediction.class === 'cup') {
+            pillCount++;
+            // 錠剤を囲む緑の枠を描画
+            ctx.beginPath();
+            ctx.rect(prediction.bbox[0], prediction.bbox[1], prediction.bbox[2], prediction.bbox[3]);
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = 'green';
+            ctx.fillStyle = 'green';
+            ctx.stroke();
+            ctx.fillText(prediction.class, prediction.bbox[0], prediction.bbox[1] > 10 ? prediction.bbox[1] - 5 : 10);
           }
-        }
+        });
 
-        // 描画結果をCanvasに反映
-        cv.imshow(canvas, src);
-
-        // 結果表示
+        // 検出された錠剤の数を表示
         result.textContent = `検出された錠剤の数: ${pillCount}`;
-
-        // 後始末
-        src.delete();
-        gray.delete();
-        blurred.delete();
-        binary.delete();
-        edges.delete();
-        contours.delete();
-        hierarchy.delete();
 
         // 次のフレームを処理
         requestAnimationFrame(processFrame);
@@ -140,12 +112,6 @@
 
       // 最初のフレームを処理
       processFrame();
-    }
-
-    function stopCamera() {
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
-      }
     }
   </script>
 </body>
