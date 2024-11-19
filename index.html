@@ -46,19 +46,31 @@
 
     async function startCamera() {
       try {
-        // 外カメラの起動
-        stream = await navigator.mediaDevices.getUserMedia({
+        // 外カメラの選択（facingMode: "environment" で外カメラを指定）
+        const constraints = {
           video: {
-            facingMode: { exact: "environment" } // 外カメラを指定
+            facingMode: "environment", // 外カメラを指定
+            width: { ideal: 1280 }, // 解像度を指定
+            height: { ideal: 720 }  // 解像度を指定
           }
-        });
+        };
+
+        // カメラを取得
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = stream;
 
         // 錠剤の検出を開始
         detectPills();
       } catch (error) {
-        result.textContent = "外カメラにアクセスできませんでした。";
         console.error(error);
+        // カメラアクセスエラーの詳細なメッセージ
+        if (error.name === "NotFoundError") {
+          result.textContent = "外カメラが見つかりませんでした。デバイスにカメラが接続されているか確認してください。";
+        } else if (error.name === "NotAllowedError") {
+          result.textContent = "カメラのアクセスが拒否されました。ブラウザの設定でカメラの許可を確認してください。";
+        } else {
+          result.textContent = "カメラにアクセスできませんでした。エラー: " + error.message;
+        }
       }
     }
 
