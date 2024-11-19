@@ -76,31 +76,49 @@
         // グレースケール変換
         cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
 
-        // 二値化
+        // 画像のぼかし (ガウスぼかし)
+        const blurred = new cv.Mat();
+        cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0);
+
+        // 二値化処理
         const binary = new cv.Mat();
-        cv.threshold(gray, binary, 127, 255, cv.THRESH_BINARY);
+        cv.threshold(blurred, binary, 127, 255, cv.THRESH_BINARY);
+
+        // エッジ検出 (Canny)
+        const edges = new cv.Mat();
+        cv.Canny(binary, edges, 50, 150);
 
         // 輪郭を検出
         const contours = new cv.MatVector();
         const hierarchy = new cv.Mat();
-        cv.findContours(binary, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+        cv.findContours(edges, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
         // 検出された輪郭を緑の枠で描画
+        let pillCount = 0;
         for (let i = 0; i < contours.size(); i++) {
           const contour = contours.get(i);
           const rect = cv.boundingRect(contour);
 
-          // 緑の枠を描画
-          cv.rectangle(src, new cv.Point(rect.x, rect.y), new cv.Point(rect.x + rect.width, rect.y + rect.height), [0, 255, 0, 255], 2);
+          // アスペクト比がほぼ1 (円形) の場合のみ錠剤と見なす
+          const aspectRatio = rect.width / rect.height;
+          if (aspectRatio > 0.8 && aspectRatio < 1.2 && rect.width > 20) {
+            pillCount++; // 錠剤としてカウント
+            cv.rectangle(src, new cv.Point(rect.x, rect.y), new cv.Point(rect.x + rect.width, rect.y + rect.height), [0, 255, 0, 255], 2);
+          }
         }
 
         // 描画結果をCanvasに反映
         cv.imshow(canvas, src);
 
+        // 結果表示
+        result.textContent = `検出された錠剤の数: ${pillCount}`;
+
         // 後始末
         src.delete();
         gray.delete();
+        blurred.delete();
         binary.delete();
+        edges.delete();
         contours.delete();
         hierarchy.delete();
 
