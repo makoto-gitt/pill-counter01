@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>錠剤カウンター</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      text-align: center;
+    }
+    video, canvas {
+      margin-top: 10px;
+      width: 100%;
+      max-width: 400px;
+      border: 1px solid #ddd;
+    }
+    button {
+      margin: 10px 0;
+      padding: 10px 20px;
+      font-size: 16px;
+    }
+    p {
+      font-size: 18px;
+      margin: 10px 0;
+    }
+  </style>
+  <!-- OpenCV.js の読み込み -->
+  <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+</head>
+<body>
+  <h1>錠剤カウンター</h1>
+  <p>必要な錠剤の数を入力してください:</p>
+  <input type="number" id="requiredPills" placeholder="必要数" />
+  <button onclick="startCounting()">カメラを起動</button>
+  <video id="video" autoplay playsinline></video>
+  <canvas id="canvas"></canvas>
+  <p id="result"></p>
+
+  <script>
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const result = document.getElementById("result");
+    let stream;
+
+    async function startCounting() {
+      const requiredPills = parseInt(document.getElementById("requiredPills").value);
+
+      if (isNaN(requiredPills) || requiredPills <= 0) {
+        result.textContent = "正しい数を入力してください。";
+        return;
+      }
+
+      // カメラの映像を取得
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: "environment", // 外カメラ（背面カメラ）を指定
+          }
+        });
+        video.srcObject = stream;
+
+        // カウント処理開始
+        video.addEventListener("play", async () => {
+          const detectedPills = await countPillsFromCamera();
+
+          // 比較して結果を表示
+          if (detectedPills === requiredPills) {
+            result.textContent = "OK: 錠剤の数が正しいです！";
+          } else if (detectedPills < requiredPills) {
+            result.textContent = `不足: あと ${requiredPills - detectedPills} 錠必要です。`;
+          } else {
+            result.textContent = `過剰: ${detectedPills - requiredPills} 錠多いです。`;
+          }
+
+          // カメラ停止
+          stopCamera();
+        });
+      } catch (error) {
+        result.textContent = "カメラにアクセスできませんでした。";
+      }
+    }
+
+    async function countPillsFromCamera() {
+      return new Promise((resolve) => {
+        const ctx = canvas.getContext("2d");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        const interval = setInterval(() => {
+          // 映像をキャプチャ
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const src = cv.imread(canvas);
+          const gray = new cv.Mat();
+
+          // グレースケール変換
+          cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+
+          // 二値化
+          const binary = new cv.Mat();
+          cv.threshold(gray, binary, 127, 255, cv.THRESH_BINARY);
+
+          // 輪郭を検出
+          const contours = new cv.MatVector();
+          const hierarchy = new cv.Mat();
+          cv.findContours(binary, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+          // 検出した錠剤の数を取得
+          const pillCount = contours.size();
+
+          // 後始末
+          src.delete();
+          gray.delete();
+          binary.delete();
+          contours.delete();
+          hierarchy.delete();
+
+          clearInterval(interval); // 処理終了
+          resolve(pillCount);
+        }, 1000); // 1秒ごとに処理
+      });
+    }
+
+    function stopCamera() {
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+    }
+  </script>
+</body>
+</html>
