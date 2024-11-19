@@ -10,7 +10,7 @@
       margin: 20px;
       text-align: center;
     }
-    video, canvas {
+    video {
       margin-top: 10px;
       width: 100%;
       max-width: 400px;
@@ -25,6 +25,9 @@
       font-size: 18px;
       margin: 10px 0;
     }
+    canvas {
+      display: none; /* 上のキャンバスを非表示に */
+    }
   </style>
   <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
 </head>
@@ -34,7 +37,7 @@
   <input type="number" id="requiredPills" placeholder="必要数" />
   <button onclick="startCounting()">カメラを起動</button>
   <video id="video" autoplay playsinline></video>
-  <canvas id="canvas" style="display:none;"></canvas>
+  <canvas id="canvas"></canvas>
   <p id="result"></p>
 
   <script>
@@ -60,15 +63,14 @@
 
         // カウント処理開始
         video.addEventListener("play", async () => {
-          // 毎フレームで円検出を行う
           const ctx = canvas.getContext("2d");
           canvas.width = video.videoWidth;
           canvas.height = video.videoHeight;
 
           function processFrame() {
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height); // 映像をcanvasに描画
-            const pillCount = countPillsFromCamera(ctx); // 錠剤のカウント
-            updateResult(pillCount, requiredPills); // 結果を更新
+            const detectedPills = countPillsFromCamera(ctx); // 錠剤のカウント
+            updateResult(detectedPills, requiredPills); // 結果をリアルタイムで更新
 
             requestAnimationFrame(processFrame); // 次のフレームを処理
           }
