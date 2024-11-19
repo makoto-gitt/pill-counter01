@@ -54,7 +54,11 @@
 
       // カメラの映像を取得
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: "environment", // 外カメラ（背面カメラ）を指定
+          }
+        });
         video.srcObject = stream;
 
         // カウント処理開始
