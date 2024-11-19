@@ -34,7 +34,7 @@
   <input type="number" id="requiredPills" placeholder="必要数" />
   <button onclick="startCounting()">カメラを起動</button>
   <video id="video" autoplay playsinline></video>
-  <canvas id="canvas"></canvas>
+  <canvas id="canvas" style="display:none;"></canvas>
   <p id="result"></p>
 
   <script>
@@ -66,29 +66,22 @@
           canvas.height = video.videoHeight;
 
           function processFrame() {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            countPillsFromCamera(ctx);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height); // 映像をcanvasに描画
+            const pillCount = countPillsFromCamera(ctx); // 錠剤のカウント
+            updateResult(pillCount, requiredPills); // 結果を更新
+
             requestAnimationFrame(processFrame); // 次のフレームを処理
           }
 
           processFrame(); // フレーム処理を開始
-
-          // 比較して結果を表示
-          let detectedPills = await countPillsFromCamera(ctx);
-          if (detectedPills === requiredPills) {
-            result.textContent = "OK: 錠剤の数が正しいです！";
-          } else if (detectedPills < requiredPills) {
-            result.textContent = `不足: あと ${requiredPills - detectedPills} 錠必要です。`;
-          } else {
-            result.textContent = `過剰: ${detectedPills - requiredPills} 錠多いです。`;
-          }
         });
       } catch (error) {
         result.textContent = "カメラにアクセスできませんでした。";
       }
     }
 
-    async function countPillsFromCamera(ctx) {
+    // 錠剤をカウントし、結果を返す
+    function countPillsFromCamera(ctx) {
       const src = cv.imread(canvas);
       const gray = new cv.Mat();
 
@@ -131,6 +124,17 @@
       circles.delete();
 
       return pillCount;
+    }
+
+    // 結果をリアルタイムで更新
+    function updateResult(detectedPills, requiredPills) {
+      if (detectedPills === requiredPills) {
+        result.textContent = `OK: 錠剤の数が正しいです！(${detectedPills}錠)`;
+      } else if (detectedPills < requiredPills) {
+        result.textContent = `不足: あと ${requiredPills - detectedPills} 錠必要です。(${detectedPills}錠検出)`;
+      } else {
+        result.textContent = `過剰: ${detectedPills - requiredPills} 錠多いです。(${detectedPills}錠検出)`;
+      }
     }
   </script>
 </body>
