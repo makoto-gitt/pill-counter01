@@ -10,7 +10,7 @@
       margin: 20px;
       text-align: center;
     }
-    video {
+    video, canvas {
       margin-top: 10px;
       width: 100%;
       max-width: 400px;
@@ -25,6 +25,16 @@
       font-size: 18px;
       margin: 10px 0;
     }
+    #videoContainer {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    #canvasContainer {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
   </style>
   <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
 </head>
@@ -33,8 +43,14 @@
   <p>必要な錠剤の数を入力してください:</p>
   <input type="number" id="requiredPills" placeholder="必要数" />
   <button onclick="startCounting()">カメラを起動</button>
-  <video id="video" autoplay playsinline></video>
-  <canvas id="canvas" style="display:none;"></canvas> <!-- canvasは表示しない -->
+
+  <div id="videoContainer">
+    <video id="video" autoplay playsinline></video>
+  </div>
+  <div id="canvasContainer">
+    <canvas id="canvas"></canvas>
+  </div>
+
   <p id="result"></p>
 
   <script>
