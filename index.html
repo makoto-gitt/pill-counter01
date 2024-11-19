@@ -109,10 +109,10 @@
         ctx.beginPath();
         ctx.arc(x, y, radius, 0, 2 * Math.PI);
         ctx.lineWidth = 4;
-        ctx.strokeStyle = 'green';
+        ctx.strokeStyle = 'green'; // 緑色の枠線
         ctx.fillStyle = 'green';
         ctx.stroke();
-        ctx.fillText("錠剤", x - 10, y - radius - 10);
+        ctx.fillText("錠剤", x - 10, y - radius - 10); // 錠剤のラベル
 
         pillCount++;
       }
