@@ -10,7 +10,7 @@
       margin: 20px;
       text-align: center;
     }
-    video, canvas {
+    video {
       margin-top: 10px;
       width: 100%;
       max-width: 400px;
@@ -34,7 +34,7 @@
   <input type="number" id="requiredPills" placeholder="必要数" />
   <button onclick="startCounting()">カメラを起動</button>
   <video id="video" autoplay playsinline></video>
-  <canvas id="canvas" style="display:none;"></canvas>
+  <canvas id="canvas" style="display:none;"></canvas> <!-- canvasは表示しない -->
   <p id="result"></p>
 
   <script>
