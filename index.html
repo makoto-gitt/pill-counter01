@@ -119,11 +119,19 @@
       let pillCount = 0;
 
       // 検出した円を描画
+      const detectedCircles = [];
       for (let i = 0; i < circles.cols; ++i) {
         const circle = circles.data32F.slice(i * 3, i * 3 + 3);
         const x = circle[0];
         const y = circle[1];
         const radius = circle[2];
+
+        // 正円に近いかどうか判定
+        const aspectRatio = radius / Math.sqrt((x - circle[0]) ** 2 + (y - circle[1]) ** 2);
+        if (aspectRatio > 0.9 && aspectRatio < 1.1) { // 近似円判定条件
+          detectedCircles.push(circle);
+          pillCount++;
+        }
 
         // 円を描画
         ctx.beginPath();
@@ -133,8 +141,6 @@
         ctx.fillStyle = 'green';
         ctx.stroke();
         ctx.fillText("錠剤", x - 10, y - radius - 10);
-
-        pillCount++;
       }
 
       // 後始末
