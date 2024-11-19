@@ -1,3 +1,4 @@
+<!--感知枠、リアルタイム数え、精度緩め-->
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -42,7 +43,6 @@
   <h1>錠剤カウンター</h1>
   <p>必要な錠剤の数を入力してください:</p>
   <input type="number" id="requiredPills" placeholder="必要数" />
-  <input type="file" id="pillImage" accept="image/*" />
   <button onclick="startCounting()">カメラを起動</button>
 
   <div id="videoContainer">
@@ -58,36 +58,13 @@
     const video = document.getElementById("video");
     const canvas = document.getElementById("canvas");
     const result = document.getElementById("result");
-    const pillImageInput = document.getElementById("pillImage");
     let stream;
-    let pillTemplate;
-
-    // 錠剤画像を読み込む
-    pillImageInput.addEventListener("change", (event) => {
-      const file = event.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          const img = new Image();
-          img.onload = function() {
-            pillTemplate = cv.imread(img);
-          };
-          img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
-      }
-    });
 
     async function startCounting() {
       const requiredPills = parseInt(document.getElementById("requiredPills").value);
 
       if (isNaN(requiredPills) || requiredPills <= 0) {
         result.textContent = "正しい数を入力してください。";
-        return;
-      }
-
-      if (!pillTemplate) {
-        result.textContent = "錠剤の画像を選択してください。";
         return;
       }
 
@@ -100,7 +77,7 @@
 
         // カウント処理開始
         video.addEventListener("play", async () => {
-          // 毎フレームで画像認識を行う
+          // 毎フレームで円検出を行う
           const ctx = canvas.getContext("2d");
           canvas.width = video.videoWidth;
           canvas.height = video.videoHeight;
@@ -124,40 +101,46 @@
     function countPillsFromCamera(ctx) {
       const src = cv.imread(canvas);
       const gray = new cv.Mat();
+
+      // グレースケ変換
       cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
 
-      // テンプレートマッチングを使って錠剤を検出
-      const result = new cv.Mat();
-      const matched = new cv.Mat();
+      // 画像を平滑化 (円を検出しやすくする)
+      const blurred = new cv.Mat();
+      cv.GaussianBlur(gray, blurred, new cv.Size(9, 9), 2, 2);
 
-      // グレースケールの錠剤画像でマッチング
-      cv.matchTemplate(gray, pillTemplate, result, cv.TM_CCOEFF_NORMED);
+      // 円の検出 (Hough変換)
+      const circles = new cv.Mat();
+      
+      // Hough変換パラメータ調整
+      cv.HoughCircles(blurred, circles, cv.HOUGH_GRADIENT, 1, 20, 100, 30, 10, 100); // minRadiusとmaxRadiusを変更
 
-      const threshold = 0.8; // マッチングしきい値
       let pillCount = 0;
 
-      // マッチング結果を評価し、一致する場所に矩形を描画
-      for (let y = 0; y < result.rows; y++) {
-        for (let x = 0; x < result.cols; x++) {
-          if (result.data32F[y * result.cols + x] > threshold) {
-            // 錠剤が一致した場所に矩形を描画
-            const point = new cv.Point(x, y);
-            const size = new cv.Size(pillTemplate.cols, pillTemplate.rows);
-            ctx.beginPath();
-            ctx.rect(point.x, point.y, size.width, size.height);
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = 'green';
-            ctx.stroke();
-            pillCount++;
-          }
-        }
+      // 検出した円を描画
+      for (let i = 0; i < circles.cols; ++i) {
+        const circle = circles.data32F.slice(i * 3, i * 3 + 3);
+        const x = circle[0];
+        const y = circle[1];
+        const radius = circle[2];
+
+        // 円を描画
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, 2 * Math.PI);
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = 'green';
+        ctx.fillStyle = 'green';
+        ctx.stroke();
+        ctx.fillText("錠剤", x - 10, y - radius - 10);
+
+        pillCount++;
       }
 
       // 後始末
       src.delete();
       gray.delete();
-      result.delete();
-      matched.delete();
+      blurred.delete();
+      circles.delete();
 
       return pillCount;
     }
