@@ -84,7 +84,8 @@
 
     // 錠剤をカウントし、結果を返す
     function countPillsFromCamera(ctx) {
-      const src = cv.imread(canvas);
+      // canvasから直接画像データを取得する
+      const src = cv.imread(video); // <video>要素から直接画像を取得
       const gray = new cv.Mat();
 
       // グレースケール変換
