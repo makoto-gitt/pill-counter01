@@ -26,7 +26,7 @@
       margin: 10px 0;
     }
     canvas {
-      display: none; /* 上のキャンバスを非表示に */
+      display: none; /* canvasは非表示にして映像のみ表示 */
     }
   </style>
   <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
@@ -84,7 +84,6 @@
 
     // 錠剤をカウントし、結果を返す
     function countPillsFromCamera(ctx) {
-      // canvasから直接画像データを取得する
       const src = cv.imread(video); // <video>要素から直接画像を取得
       const gray = new cv.Mat();
 
