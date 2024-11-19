@@ -78,9 +78,9 @@
           if (detectedPills === requiredPills) {
             result.textContent = "OK: 錠剤の数が正しいです！";
           } else if (detectedPills < requiredPills) {
-            result.textContent = 不足: あと ${requiredPills - detectedPills} 錠必要です。;
+            result.textContent = `不足: あと ${requiredPills - detectedPills} 錠必要です。`;
           } else {
-            result.textContent = 過剰: ${detectedPills - requiredPills} 錠多いです。;
+            result.textContent = `過剰: ${detectedPills - requiredPills} 錠多いです。`;
           }
         });
       } catch (error) {
@@ -134,4 +134,4 @@
     }
   </script>
 </body>
-</html> 
+</html>
