@@ -10,14 +10,11 @@
       margin: 20px;
       text-align: center;
     }
-    video {
+    video, canvas {
       margin-top: 10px;
       width: 100%;
       max-width: 400px;
       border: 1px solid #ddd;
-    }
-    canvas {
-      display: none;
     }
     button {
       margin: 10px 0;
@@ -36,7 +33,7 @@
   <h1>錠剤カウンター</h1>
   <p>必要な錠剤の数を入力してください:</p>
   <input type="number" id="requiredPills" placeholder="必要数" />
-  <button onclick="startCounting()">カメラを起動</button>
+  <button onclick="startCamera()">カメラを起動</button>
   <video id="video" autoplay playsinline></video>
   <canvas id="canvas"></canvas>
   <p id="result"></p>
@@ -46,43 +43,32 @@
     const canvas = document.getElementById("canvas");
     const result = document.getElementById("result");
     let stream;
-    let processing = false;
 
-    async function startCounting() {
-      const requiredPills = parseInt(document.getElementById("requiredPills").value);
-
-      if (isNaN(requiredPills) || requiredPills <= 0) {
-        result.textContent = "正しい数を入力してください。";
-        return;
-      }
-
-      // カメラの映像を取得（外カメラ固定）
+    async function startCamera() {
       try {
+        // 外カメラの起動
         stream = await navigator.mediaDevices.getUserMedia({
           video: {
-            facingMode: { exact: "environment" } // 外カメラを必須で使用
+            facingMode: { exact: "environment" } // 外カメラを指定
           }
         });
         video.srcObject = stream;
 
-        // カメラ映像を処理
-        processCameraFeed(requiredPills);
+        // 錠剤の検出を開始
+        detectPills();
       } catch (error) {
         result.textContent = "外カメラにアクセスできませんでした。";
         console.error(error);
       }
     }
 
-    function processCameraFeed(requiredPills) {
-      if (processing) return; // 処理が重複しないようにする
-      processing = true;
-
+    function detectPills() {
       const ctx = canvas.getContext("2d");
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
 
-      const interval = setInterval(() => {
-        // 映像をキャプチャ
+      function processFrame() {
+        // カメラ映像をキャプチャ
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const src = cv.imread(canvas);
         const gray = new cv.Mat();
@@ -99,17 +85,17 @@
         const hierarchy = new cv.Mat();
         cv.findContours(binary, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
-        // 検出した錠剤の数を取得
-        const pillCount = contours.size();
+        // 検出された輪郭を緑の枠で描画
+        for (let i = 0; i < contours.size(); i++) {
+          const contour = contours.get(i);
+          const rect = cv.boundingRect(contour);
 
-        // 結果を表示
-        if (pillCount === requiredPills) {
-          result.textContent = "OK: 錠剤の数が正しいです！";
-        } else if (pillCount < requiredPills) {
-          result.textContent = `不足: あと ${requiredPills - pillCount} 錠必要です。`;
-        } else {
-          result.textContent = `過剰: ${pillCount - requiredPills} 錠多いです。`;
+          // 緑の枠を描画
+          cv.rectangle(src, new cv.Point(rect.x, rect.y), new cv.Point(rect.x + rect.width, rect.y + rect.height), [0, 255, 0, 255], 2);
         }
+
+        // 描画結果をCanvasに反映
+        cv.imshow(canvas, src);
 
         // 後始末
         src.delete();
@@ -118,11 +104,12 @@
         contours.delete();
         hierarchy.delete();
 
-        // 処理を停止
-        clearInterval(interval);
-        stopCamera();
-        processing = false;
-      }, 1000); // 1秒ごとに処理
+        // 次のフレームを処理
+        requestAnimationFrame(processFrame);
+      }
+
+      // 最初のフレームを処理
+      processFrame();
     }
 
     function stopCamera() {
